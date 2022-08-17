@@ -25,12 +25,12 @@ func getPathURL(path string) string {
 func bodyToMap(res *http.Response) map[string]interface{} {
 	resBody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal("could not read response body\n", err)
+		log.Fatal("Could not read response body\n", err)
 	}
 	var resData map[string]interface{}
 	err = json.Unmarshal(resBody, &resData)
 	if err != nil {
-		log.Fatal("failed to convert JSON to map\n", err)
+		log.Fatal("Failed to convert JSON to map\n", err)
 	}
 
 	return resData
@@ -46,7 +46,7 @@ func hashLookup(content []byte) *http.Response {
 	// fmt.Println("Got requestURL:", requestURL)
 	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
-		log.Fatal("error generating http request\n", err)
+		log.Fatal("Error generating http request\n", err)
 	}
 	req.Header.Set("apikey", apiKey)
 
@@ -56,7 +56,7 @@ func hashLookup(content []byte) *http.Response {
 
 	res, err := client.Do(req)
 	if err != nil {
-		log.Fatal("error making http request\n", err)
+		log.Fatal("Error making http request\n", err)
 	}
 
 	println("done.")
@@ -64,17 +64,32 @@ func hashLookup(content []byte) *http.Response {
 }
 
 func scanFile(content []byte) *http.Response {
+	println("Checking file against Metadefender Cloud:")
+	file, err := os.Open(filename)
+	defer file.Close()
+	if err != nil {
+		log.Fatal("Error opening file\n", err)
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	defer writer.Close()
+	_, err = writer.CreateFormFile("file", filename)
+	if err != nil {
+		log.Fatal("Error creating multipart writer form file\n", err)
+	}
+
 	println("Uploading file to Metadefender Cloud...")
 
 	requestURL := fmt.Sprintf("%s", getPathURL("file"))
 	// fmt.Println("Got requestURL:", requestURL)
-	bodyReader := bytes.NewReader(content)
-	req, err := http.NewRequest(http.MethodGet, requestURL, bodyReader)
+	// bodyReader := bytes.NewReader(content)
+	req, err := http.NewRequest(http.MethodPost, requestURL, body)
 	if err != nil {
-		log.Fatal("error generating http request\n", err)
+		log.Fatal("Error generating http request\n", err)
 	}
 	req.Header.Set("apikey", apiKey)
-	req.Header.Set("Content-Type", multipart.Writer.FormDataContentType())
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("filename", filename)
 
 	client := http.Client{
@@ -83,18 +98,18 @@ func scanFile(content []byte) *http.Response {
 
 	res, err := client.Do(req)
 	if err != nil {
-		log.Fatal("error making http request\n", err)
+		log.Fatal("Error making http request\n", err)
 	}
 
 	println("done.")
 
 	if res.StatusCode == 400 {
 		resData := bodyToMap(res)
-		log.Fatalf("Bad response, got message: %s", resData["message"])
+		log.Fatalf("Bad response, status: %s, got message: %s", res.Status, resData["messages"])
 	} else if res.StatusCode == 200 {
 		println("Successfully uploaded file.")
 	} else {
-		log.Fatal("Got unhandled response: ", res.Status)
+		log.Fatalf("Got unhandled response: %s", res.Status)
 	}
 	return res
 }
@@ -109,7 +124,7 @@ func main() {
 	println("Reading file:", filename)
 	content, err := os.ReadFile(filename)
 	if err != nil {
-		log.Fatal("error reading file\n", err)
+		log.Fatal("Error reading file\n", err)
 	}
 
 	res := hashLookup(content)
@@ -117,7 +132,7 @@ func main() {
 	println("Got http response:", res.Status)
 	if res.StatusCode == 404 {
 		res = scanFile(content)
-		println("got response status:", res.Status)
+		println("Got response status:", res.Status)
 	} else if res.StatusCode == 200 {
 		println("Need to display results...")
 	} else {
