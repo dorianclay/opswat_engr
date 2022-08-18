@@ -148,7 +148,7 @@ func scanFile() *http.Response {
 
 	// ...otherwise the status code was 200, and upload was successful
 	resData := bodyToMap(res)
-	log.Printf("Upload successful. Spot %f in queue.\n", resData["in_queue"])
+	log.Printf("Upload successful. Spot %.0f in queue.\n", resData["in_queue"])
 
 	// Keep fetching the result until it is complete
 	log.Printf("Scanning in progress...\n")
@@ -174,7 +174,7 @@ func scanFile() *http.Response {
 		// Query for the progress
 		jsonq := gojsonq.New().FromInterface(bodyToMap(res))
 		scanProgress := jsonq.Find("scan_results.progress_percentage")
-		log.Printf("%f%% finished", scanProgress)
+		log.Printf("%.0f%% finished", scanProgress)
 
 		// If the scan is done, return the response
 		if scanProgress == 100.0 {
@@ -187,7 +187,19 @@ func scanFile() *http.Response {
 
 // Print the output of a successful response from MetaDefender Cloud API for file scanning
 func printOutput(res *http.Response) {
+	log.Println("Printing output to command line...")
 
+	// Create a JSON Query object to get response attributes
+	resData := bodyToMap(res)
+	jsonq := gojsonq.New().FromInterface(resData)
+
+	fmt.Println("filename:", filename)
+	fmt.Println("overall_status:", jsonq.Copy().Find("scan_results.scan_all_result_a"))
+
+	scanDetails := jsonq.Copy().Find("scan_results.scan_details").(map[string]interface{})
+	for engine, data := range scanDetails {
+		fmt.Printf("engine: %s, data: %T\n", engine, data)
+	}
 }
 
 // Main program entry point.
@@ -202,7 +214,7 @@ func main() {
 	// Perform hash lookup
 	res := hashLookup()
 
-	log.Println("Got http response:", res.Status)
+	log.Println("Got response:", res.Status)
 
 	// If the file hash wasn't found...
 	if res.StatusCode == 404 {
