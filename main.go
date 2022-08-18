@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	gojsonq "github.com/thedevsaddam/gojsonq/v2"
 )
 
 const apiURL = "https://api.metadefender.com/v4"
@@ -88,7 +90,7 @@ func scanFile() *http.Response {
 	writer.Close()
 
 	// Create an HTTP post request to upload
-	log.Println("Uploading file to Metadefender Cloud...")
+	log.Print("Uploading file to Metadefender Cloud...")
 	requestURL := fmt.Sprintf("%s", getPathURL("file"))
 	req, err := http.NewRequest(http.MethodPost, requestURL, body)
 	if err != nil {
@@ -123,7 +125,7 @@ func scanFile() *http.Response {
 
 	// ...otherwise the status code was 200, and upload was successful
 	resData := bodyToMap(res)
-	log.Printf("Upload successful. Spot %d in queue.\n", resData["in_queue"])
+	log.Printf("Upload successful. Spot %f in queue.\n", resData["in_queue"])
 
 	log.Printf("Scanning in progress...\n")
 	// Keep fetching the result until it is complete
@@ -145,11 +147,16 @@ func scanFile() *http.Response {
 			log.Fatal("Error making http request\n", err)
 		}
 
-		resData = bodyToMap(res)
-
+		// Query for the progress, if scan is done, stop fetching
+		jsonq := gojsonq.New().FromInterface(bodyToMap(res))
+		scanProgress := jsonq.Find("scan_results.progress_percentage")
+		log.Printf("%f%% finished", scanProgress)
+		if scanProgress == 100.0 {
+			return res
+		}
+		// Wait a for 200ms
+		time.Sleep(time.Millisecond * 200)
 	}
-
-	return res
 }
 
 func main() {
