@@ -193,12 +193,21 @@ func printOutput(res *http.Response) {
 	resData := bodyToMap(res)
 	jsonq := gojsonq.New().FromInterface(resData)
 
+	// Print the generic information
 	fmt.Println("filename:", filename)
 	fmt.Println("overall_status:", jsonq.Copy().Find("scan_results.scan_all_result_a"))
 
+	// Get the list of details for all engines
 	scanDetails := jsonq.Copy().Find("scan_results.scan_details").(map[string]interface{})
+	// For each engine...
 	for engine, data := range scanDetails {
-		fmt.Printf("engine: %s, data: %T\n", engine, data)
+		// ...create a new JSON query object
+		jsonq = gojsonq.New().FromInterface(data)
+		// ...and print all the information for the engine
+		fmt.Println("engine:", engine)
+		fmt.Println("threat_found:", jsonq.Copy().Find("threat_found"))
+		fmt.Println("scan_result:", jsonq.Copy().Find("scan_result_i"))
+		fmt.Println("def_time:", jsonq.Copy().Find("def_time"))
 	}
 }
 
