@@ -225,6 +225,19 @@ func main() {
 		log.Fatalf("Please modify the API key. Got: '%s'", apiKey)
 	}
 
+	// Open a file to log to
+	logfile, err := os.OpenFile("filescan.log", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		log.Println("Failed to open logging file. Logging to console instead.")
+	} else {
+		defer logfile.Close()
+		log.SetOutput(logfile)
+		log.Printf("SCANNING A NEW FILE...\n")
+	}
+
+	// Print the filename immediately to indicate program is running to user
+	fmt.Println("filename:", filename)
+
 	// Perform hash lookup
 	res := hashLookup()
 
