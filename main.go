@@ -220,6 +220,11 @@ func main() {
 		filename = os.Args[1]
 	}
 
+	// Check that API key has been set
+	if apiKey == "" {
+		log.Fatalf("Please modify the API key. Got: '%s'", apiKey)
+	}
+
 	// Perform hash lookup
 	res := hashLookup()
 
