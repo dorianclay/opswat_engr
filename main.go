@@ -26,15 +26,10 @@ func getPathURL(path string) string {
 }
 
 // Generate a map from a given response body
-func bodyToMap(res *http.Response) map[string]interface{} {
-	// Read the response body
-	resBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal("Could not read response body\n", err)
-	}
+func bodyToMap(resBody []byte) map[string]interface{} {
 	// Unpack the body into a <string, interface> map
 	var resData map[string]interface{}
-	err = json.Unmarshal(resBody, &resData)
+	err := json.Unmarshal(resBody, &resData)
 	if err != nil {
 		log.Fatal("Failed to convert JSON to map\n", err)
 	}
@@ -60,7 +55,7 @@ func hashLookup() *http.Response {
 	//   supported by the API of {MD5, SHA1, SHA256}.
 	log.Println("Generating MD5 hash...")
 	hash := md5.Sum(content)
-	log.Printf("done. Got hash: %x", hash)
+	log.Printf("Got hash: %x", hash)
 
 	// Create an HTTP GET request to check if the file has already been scanned
 	log.Println("Attempting to retrieve scan report with file hash...")
@@ -83,13 +78,12 @@ func hashLookup() *http.Response {
 		log.Fatal("Error making http request\n", err)
 	}
 
-	log.Println("done.")
 	// Return the response no matter what it is
 	return res
 }
 
 // Scan a file with the MetaDefender Cloud API
-func scanFile() *http.Response {
+func scanFile() []byte {
 	// Even though we already read the file, we now need to open it
 	// so it can be uploaded as a multi-part form
 	log.Println("Checking file against Metadefender Cloud:")
@@ -135,11 +129,14 @@ func scanFile() *http.Response {
 		log.Fatal("Error making http request\n", err)
 	}
 
-	log.Println("done.")
-
 	// If the status code is 400, the request was likely incorrect...
 	if res.StatusCode == 400 {
-		resData := bodyToMap(res)
+		// Read the response body
+		resBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			log.Fatal("Could not read response body\n", err)
+		}
+		resData := bodyToMap(resBody)
 		log.Fatalf("Bad response, status: %s, got message: %s", res.Status, resData["error"])
 		// ...or if the status isn't 200, then something went completely wrong.
 	} else if res.StatusCode != 200 {
@@ -147,7 +144,12 @@ func scanFile() *http.Response {
 	}
 
 	// ...otherwise the status code was 200, and upload was successful
-	resData := bodyToMap(res)
+	// Read the response body
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal("Could not read response body\n", err)
+	}
+	resData := bodyToMap(resBody)
 	log.Printf("Upload successful. Spot %.0f in queue.\n", resData["in_queue"])
 
 	// Keep fetching the result until it is complete
@@ -172,29 +174,32 @@ func scanFile() *http.Response {
 		}
 
 		// Query for the progress
-		jsonq := gojsonq.New().FromInterface(bodyToMap(res))
+		resBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			log.Fatal("Could not read response body\n", err)
+		}
+		jsonq := gojsonq.New().FromInterface(bodyToMap(resBody))
 		scanProgress := jsonq.Find("scan_results.progress_percentage")
 		log.Printf("%.0f%% finished", scanProgress)
 
 		// If the scan is done, return the response
 		if scanProgress == 100.0 {
-			return res
+			return resBody
 		}
-		// Wait a for 250ms
-		time.Sleep(time.Millisecond * 250)
+		// Wait a for 500ms
+		time.Sleep(time.Millisecond * 500)
 	}
 }
 
 // Print the output of a successful response from MetaDefender Cloud API for file scanning
-func printOutput(res *http.Response) {
+func printOutput(resBody []byte) {
 	log.Println("Printing output to command line...")
 
 	// Create a JSON Query object to get response attributes
-	resData := bodyToMap(res)
+	resData := bodyToMap(resBody)
 	jsonq := gojsonq.New().FromInterface(resData)
 
 	// Print the generic information
-	fmt.Println("filename:", filename)
 	fmt.Println("overall_status:", jsonq.Copy().Find("scan_results.scan_all_result_a"))
 
 	// Get the list of details for all engines
@@ -246,11 +251,15 @@ func main() {
 	// If the file hash wasn't found...
 	if res.StatusCode == 404 {
 		// ...scan the file
-		res = scanFile()
-		printOutput(res)
+		resBody := scanFile()
+		printOutput(resBody)
 		// ...otherwise, if successful, print the output
 	} else if res.StatusCode == 200 {
-		printOutput(res)
+		resBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			log.Fatal("Could not read response body\n", err)
+		}
+		printOutput(resBody)
 		// ...otherwise, the status is undefined by the API
 	} else {
 		log.Fatal("Got unhandled response:", res.Status)
