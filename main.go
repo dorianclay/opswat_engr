@@ -16,7 +16,7 @@ import (
 )
 
 const apiURL = "https://api.metadefender.com/v4"
-const apiKey = "6bee20afb8e4dc522b9d931f4490b540"
+const apiKey = ""
 
 var filename string
 
