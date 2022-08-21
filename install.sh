@@ -3,7 +3,7 @@
 printf "Installing go...\n"
 curl -OL https://go.dev/dl/go1.19.linux-amd64.tar.gz
 
-tar -C /usr/local -xvf go1.19.linux-amd64.tar.gz
+sudo tar -C /usr/local -xvf go1.19.linux-amd64.tar.gz
 
 printf "export PATH=\$PATH:/usr/local/go/bin" >> ~/.profile
 
